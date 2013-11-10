@@ -36,7 +36,7 @@ typedef struct Floor {
 
 static Disc discs[NUM_DISCS];
 static Floor floors[NUM_FLOORS];
-static int speed = INIT_SPEED;
+
 static Window *window;
 static GRect window_frame;
 static Layer *game_layer;
@@ -45,6 +45,20 @@ static int nextFloor = 20;
 static int score = 0;
 static bool game_over = false;
 static int LOOP_TIME = 30;
+static int speed = INIT_SPEED;
+
+static void init(void);
+static void deinit(void);
+
+static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
+  window_stack_pop(true);
+  deinit();
+  init();
+}
+
+static void click_config_provider(void *context) {
+  window_single_click_subscribe(BUTTON_ID_SELECT, select_click_handler);
+}
 
 
 static double disc_calc_mass(Disc *disc) {
@@ -193,33 +207,43 @@ static void timer_callback(void *data) {
 
 
   AccelData accel = { 0, 0, 0 };
-
   accel_service_peek(&accel);
-	
-  for (int i = 0; i < NUM_FLOORS; i++) {
+
+	if (game_over){
+		if(abs(accel.x) + abs(accel.y) + abs(accel.z) > 2000)
+		{	
+			window_stack_pop(true);
+  		deinit();
+  		init();
+  		return;
+  	}
+  }
+	else{
+  	for (int i = 0; i < NUM_FLOORS; i++) {
      Floor *floor = &floors[i];
      floor_update(floor);
-  }
+  	}
   
-  Disc *disc = &discs[0];
-  disc_apply_accel(disc, accel);
-  disc_update(disc);
+  	Disc *disc = &discs[0];
+  	disc_apply_accel(disc, accel);
+  	disc_update(disc);
 	
-  /* 
-  for (int i = 0; i < NUM_DISCS; i++) {
+  	/* 
+  	for (int i = 0; i < NUM_DISCS; i++) {
      Disc *disc = &discs[i];
      disc_apply_accel(disc, accel);
      disc_update(disc);
-  }
-  */
+  	}
+  	*/
 
-  layer_mark_dirty(game_layer);
-	if (!game_over)
+  	layer_mark_dirty(game_layer);
+
+  }
   timer = app_timer_register(LOOP_TIME /* milliseconds */, timer_callback, NULL);
 }
 
 static void handle_accel(AccelData *accel_data, uint32_t num_samples) {
-  // do nothing
+
 }
 
 static void window_load(Window *window) {
@@ -261,7 +285,16 @@ static void window_unload(Window *window) {
 }
 
 static void init(void) {
+ nextFloor = 20;
+ score = 0;
+ game_over = false;
+ LOOP_TIME = 30;
+ speed = INIT_SPEED;
+
+
   window = window_create();
+  window_set_click_config_provider(window, click_config_provider);
+  
   window_set_window_handlers(window, (WindowHandlers) {
     .load = window_load,
     .unload = window_unload
